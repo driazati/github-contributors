@@ -1,4 +1,3 @@
-import requests
 import yaml
 import json
 import asyncio
@@ -101,6 +100,7 @@ class Contributions:
         results = []
 
         def aggregate(repo, data):
+            print(repo, data)
             results.append((repo, data))
 
         await self.per_orgs(
@@ -233,7 +233,7 @@ class Contributions:
                 else:
                     posts = r.get("posts", [])
                     posts = [
-                        {"url": base + f'{post["topic_id"]}/{post["id"]}'}
+                        {"url": base + f'{post["topic_id"]}/{post["post_number"]}'}
                         for post in posts
                     ]
                     topics = r.get("topics", [])
@@ -401,8 +401,6 @@ class GraphQL:
         with open(cache, "r") as f:
             contents = json.load(f)
 
-        # await cont.discourse()
-        # exit(0)
         if login in contents:
             return True
 
@@ -458,7 +456,7 @@ class GraphQL:
 
 async def main(args):
     repos = [r.strip() for r in args.repos.split(",")]
-    orgs = args.organizations.split(",")
+    orgs = list({x.split("/")[0] for x in repos})
     date_from = args.date_from
     date_to = args.date_to
     now = datetime.datetime.now().replace(microsecond=0)
@@ -574,19 +572,43 @@ def summarize(args):
     orgs = content["$$ORGS$$"]
     out = ""
 
-    def ul(items, padding=None):
-        nonlocal out
+    def ul(items, get_link=None, get_text=None, padding=None):
+        result = ""
         if padding is not None:
-            out += f'<ul style="padding-left: {padding}">'
+            result += f'<ul style="padding-left: {padding}">'
         else:
-            out += "<ul>"
+            result += "<ul>"
         for item in items:
-            out += f"<li>{item}</li>"
-        out += "</ul>"
+            text = item
+            if get_text:
+                text = get_text(item)
+            if get_link:
+                text = f'<a href="{get_link(item)}">{text}</a>'
+            result += f"<li>{text}</li>"
+        result += "</ul>"
+        return result
 
+
+    out += """
+        <p>
+            This is a list of non-committers that have been active on TVM and related repos in the last month. The intention of this list is to start off discussions within the PMC around who should be promoted to a committer (i.e. for every person with > some threshold of contributions, why or why aren’t they a committer). 
+        </p>
+        <p>
+            The TVM docs state a 3 +1 votes for approval with no vetoes is required to become a committer: <a href="https://tvm.apache.org/docs/contribute/community.html#committers">https://tvm.apache.org/docs/contribute/community.html#committers</a>. Also see the <a href="https://community.apache.org/newcommitter.html">Apache new committer guidelines</a>.
+        </p>
+    """
     out += "<h2>Contributions</h2>"
 
-    ul([f"From {date_from}", f"To {date_to}", f"Repos {repos}", f"Orgs {orgs}"])
+    repo_link = lambda x: f"http://github.com/{x}"
+    out += ul(
+        [
+            "This does not purport the significance of each contribution and is merely a jumping off point for further discussion and manual investigation into each potential new committer",
+            f'Generated at {datetime.datetime.now().replace(microsecond=0)} by <a href="https://github.com/driazati/github-contributors">https://github.com/driazati/github-contributors</a>',
+            f"From {date_from}",
+            f"To {date_to}",
+            f"Repos searched {ul(repos, get_link=repo_link)}",
+        ]
+    )
 
     for login, data in content.items():
         if login.startswith("$$"):
@@ -605,44 +627,12 @@ def summarize(args):
         discuss_participated_topics = data["participated_topics"]
 
         total += len(issues_created)
-        report += f"{len(issues_created)} issue(s)\n"
-        details += textwrap.indent(json.dumps(issues_created, indent=2), prefix="  ")
-        details += "\n"
-
         commit_count = sum(x[1]["totalCount"] for x in commits)
         total += commit_count
-        report += (
-            f"{commit_count} commit(s) in repos {', '.join([x[0] for x in commits])}\n"
-        )
-
         total += len(prs)
-        files = sum(pr["changedFiles"] for pr in prs)
-        additions = sum(pr["additions"] for pr in prs)
-        deletions = sum(pr["deletions"] for pr in prs)
-        report += f"{len(prs)} PR(s) (+{additions}, -{deletions} lines across {files} files)\n"
-        details += textwrap.indent(json.dumps(prs, indent=2), prefix="  ")
-        details += "\n"
-
         total += len(pr_reviews)
-        report += f"{len(pr_reviews)} PR review(s)\n"
-        details += textwrap.indent(json.dumps(pr_reviews, indent=2), prefix="  ")
-        details += "\n"
-
         total += len(issue_and_pr_comments)
-        report += f"{len(issue_and_pr_comments)} issue/PR comments\n"
-        details += textwrap.indent(
-            json.dumps(issue_and_pr_comments, indent=2), prefix="  "
-        )
-        details += "\n"
-
         total += len(discuss_posts)
-        report += f"{len(discuss_posts)} Discuss posts (across {len(discuss_participated_topics)} topics)"
-        details += textwrap.indent(json.dumps(discuss_posts, indent=2), prefix="  ")
-        details += "\n"
-        details += textwrap.indent(
-            json.dumps(discuss_participated_topics, indent=2), prefix="  "
-        )
-        details += "\n"
 
         summaries.append(
             {
@@ -671,30 +661,50 @@ def summarize(args):
 
         out += f'<h3><a href="https://github.com/{summary["login"]}">{summary["login"]}</a> ({summary["total"]} total)</h3>'
         out += "<ul>"
-        out += f"<li>{len(commits)} commits</li>"
-        out += f"<li>{len(prs)} PR(s) (+{additions}, -{deletions} lines across {files} files)</li>"
-        out += '<ul style="padding-left: 20px">'
-        for pr in prs:
-            out += f'<li><a href="{pr["url"]}">{pr["title"]}</a></li>'
-        out += "</ul>"
-        out += f"<li>{len(pr_reviews)} PR reviews created</li>"
 
-        out += '<ul style="padding-left: 20px">'
-        for review in pr_reviews:
-            out += f'<li><a href="{review["url"]}">{review["url"]}</a></li>'
-        out += "</ul>"
+        commit_count = sum(x[1]["totalCount"] for x in commits)
+        out += f"<li>{commit_count} commits</li>"
 
-        out += f"<li>{len(issue_and_pr_comments)} PR/issues comments</li>"
-        out += '<ul style="padding-left: 20px">'
-        for comment in issue_and_pr_comments:
-            out += f'<li><a href="{comment["url"]}">{comment["url"]}</a></li>'
-        out += "</ul>"
+        since = datetime.datetime.fromisoformat(date_from).strftime("%Y-%m-%d")
+        until = datetime.datetime.fromisoformat(date_to).strftime("%Y-%m-%d")
+
+        def user_commits(x):
+            repo = x[0]
+            return f"https://github.com/{repo}/commits?author={summary['login']}&since={since}&until={until}"
+
+        out += ul(
+            commits,
+            get_text=lambda x: f"{x[1]['totalCount']} in {x[0]}",
+            get_link=user_commits,
+            padding="20px",
+        )
+
+        files = sum(pr["changedFiles"] for pr in prs)
+        additions = sum(pr["additions"] for pr in prs)
+        deletions = sum(pr["deletions"] for pr in prs)
+        get_url = lambda x: x["url"]
+        pr_summaries = [
+            f'<a href="https://github.com/pulls?q=author%3A{summary["login"]}+user%3A{org}+">{org}</a>' for org in orgs
+        ]
+        out += f"<li>{len(prs)} PR(s) created (+{additions}, -{deletions} lines across {files} files) ({', '.join(pr_summaries)})</li>"
+        out += ul(
+            prs, get_text=lambda pr: pr["title"], get_link=get_url, padding="20px"
+        )
+
+        review_summaries = [
+            f'<a href="https://github.com/pulls?q=reviewed-by%3A{summary["login"]}+user%3A{org}+">{org}</a>' for org in orgs
+        ]
+        out += f"<li>{len(pr_reviews)} PR reviews created (approve, request changes, etc) ({', '.join(review_summaries)})</li>"
+        out += ul(pr_reviews, get_link=get_url, get_text=get_url, padding="20px")
+
+        out += f"<li>{len(issue_and_pr_comments)} comments on PRs and issues</li>"
+        out += ul(
+            issue_and_pr_comments, get_link=get_url, get_text=get_url, padding="20px"
+        )
 
         out += f"<li>{len(discuss_posts)} Discuss posts (across {len(discuss_participated_topics)} topics)</li>"
-        out += '<ul style="padding-left: 20px">'
-        for post in discuss_posts:
-            out += f'<li><a href="{post["url"]}">{post["url"]}</a></li>'
-        out += "</ul>"
+        out += ul(discuss_posts, get_link=get_url, get_text=get_url, padding="20px")
+
         out += "</ul>"
 
     p = Path("contribution_report.html")
@@ -715,16 +725,13 @@ if __name__ == "__main__":
         "--date-to", help="ISO 8601 date to stop looking at contributions"
     )
     parser.add_argument(
-        "--repos", default="apache/tvm,apache/tvm-rfcs", help="GitHub repos to search"
+        "--repos",
+        default="apache/tvm,apache/tvm-rfcs,tlc-pack/tlcpack,tlc-pack/ci,apache/tvm-site,apache/tvm-vta",
+        help="GitHub repos to search",
     )
     parser.add_argument("--cache", default="cache.json", help="cache results file")
     parser.add_argument(
         "--summarize", action="store_true", help="read from cache, don't fetch anything"
-    )
-    parser.add_argument(
-        "--organizations",
-        default="apache,tlc-pack",
-        help="comma separated list of GitHub organizations to filter by",
     )
     args = parser.parse_args()
 
