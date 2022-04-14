@@ -8,10 +8,13 @@ pip install -r requirements.txt
 
 python contributions.py --help
 
-# Run this a few times until it says it's done
+# Generate at https://github.com/settings/tokens
 export GITHUB_TOKEN=ghp_1234567
+
+# Run this a few times until it says it's done
 python contributions.py
 
+# Output information into 'contributions_report.html'
 python contributions.py --summarize
 ```
 

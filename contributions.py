@@ -298,10 +298,7 @@ class GraphQL:
                 verify(r)
             return r
         except Exception as e:
-            sprint(
-                f"Retrying query {query[:100]}, remaining attempts: {retries - 1}\n{e}",
-                file=sys.stderr,
-            )
+            sprint(f"Retrying query {query[:100]}, remaining attempts: {retries - 1}\n{e}")
             return await self.query(query, verify=verify, retries=retries - 1)
 
     async def triagers(self):
@@ -591,10 +588,10 @@ def summarize(args):
 
     out += """
         <p>
-            This is a list of non-committers that have been active on TVM and related repos in the last month. The intention of this list is to start off discussions within the PMC around who should be promoted to a committer (i.e. for every person with > some threshold of contributions, why or why aren’t they a committer). 
+            This is a list of non-committers that have been active on TVM and related repos in the last month. The intention of this document is to help PMC to get more information about possible committer candidates.
         </p>
         <p>
-            The TVM docs state a 3 +1 votes for approval with no vetoes is required to become a committer: <a href="https://tvm.apache.org/docs/contribute/community.html#committers">https://tvm.apache.org/docs/contribute/community.html#committers</a>. Also see the <a href="https://community.apache.org/newcommitter.html">Apache new committer guidelines</a>.
+            Note that all forms of contributions should be considered and the statistics here only serve as a reference. They do not directly correspond to the community's view of significance of contributions. See our reference document <a href="https://tvm.apache.org/docs/contribute/community.html#committers">https://tvm.apache.org/docs/contribute/community.html#committers</a> and the Apache <a href="https://community.apache.org/newcommitter.html">new committer guidelines</a> for details.
         </p>
     """
     out += "<h2>Contributions</h2>"
@@ -603,7 +600,7 @@ def summarize(args):
     out += ul(
         [
             "This does not purport the significance of each contribution and is merely a jumping off point for further discussion and manual investigation into each potential new committer",
-            f'Generated at {datetime.datetime.now().replace(microsecond=0)} by <a href="https://github.com/driazati/github-contributors">https://github.com/driazati/github-contributors</a>',
+            f'Generated at {datetime.datetime.now().replace(microsecond=0)} by <a href="https://github.com/driazati/github-contributors">https://github.com/driazati/github-contributors</a>, see <a href="https://github.com/driazati/github-contributors/blob/main/README.md">README.md</a> for instructions.',
             f"From {date_from}",
             f"To {date_to}",
             f"Repos searched {ul(repos, get_link=repo_link)}",
