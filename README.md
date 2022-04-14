@@ -16,6 +16,9 @@ python contributions.py
 
 # Output information into 'contributions_report.html'
 python contributions.py --summarize
+
+# Output full information into 'contributions_report_long.html'
+python contributions.py --summarize-long
 ```
 
 Notes:

@@ -298,7 +298,9 @@ class GraphQL:
                 verify(r)
             return r
         except Exception as e:
-            sprint(f"Retrying query {query[:100]}, remaining attempts: {retries - 1}\n{e}")
+            sprint(
+                f"Retrying query {query[:100]}, remaining attempts: {retries - 1}\n{e}"
+            )
             return await self.query(query, verify=verify, retries=retries - 1)
 
     async def triagers(self):
@@ -553,7 +555,7 @@ async def main(args):
             print("Keep re-running until misses == 0")
 
 
-def summarize(args):
+def summarize(args, long: bool):
     path = Path(args.cache)
     if not path.exists():
         print(f"{path} doesn't exist, run 'python contributions.py' first")
@@ -584,7 +586,6 @@ def summarize(args):
             result += f"<li>{text}</li>"
         result += "</ul>"
         return result
-
 
     out += """
         <p>
@@ -644,7 +645,7 @@ def summarize(args):
     out += "<br />"
 
     for summary in summaries:
-        if summary["total"] == 0:
+        if summary["total"] < 10:
             continue
 
         data = summary["data"]
@@ -681,30 +682,42 @@ def summarize(args):
         deletions = sum(pr["deletions"] for pr in prs)
         get_url = lambda x: x["url"]
         pr_summaries = [
-            f'<a href="https://github.com/pulls?q=author%3A{summary["login"]}+user%3A{org}+">{org}</a>' for org in orgs
+            f'<a href="https://github.com/pulls?q=author%3A{summary["login"]}+user%3A{org}+">{org}</a>'
+            for org in orgs
         ]
         out += f"<li>{len(prs)} PR(s) created (+{additions}, -{deletions} lines across {files} files) ({', '.join(pr_summaries)})</li>"
-        out += ul(
-            prs, get_text=lambda pr: pr["title"], get_link=get_url, padding="20px"
-        )
+        if long:
+            out += ul(
+                prs, get_text=lambda pr: pr["title"], get_link=get_url, padding="20px"
+            )
 
         review_summaries = [
-            f'<a href="https://github.com/pulls?q=reviewed-by%3A{summary["login"]}+user%3A{org}+">{org}</a>' for org in orgs
+            f'<a href="https://github.com/pulls?q=reviewed-by%3A{summary["login"]}+user%3A{org}+">{org}</a>'
+            for org in orgs
         ]
         out += f"<li>{len(pr_reviews)} PR reviews created (approve, request changes, etc) ({', '.join(review_summaries)})</li>"
-        out += ul(pr_reviews, get_link=get_url, get_text=get_url, padding="20px")
+        if long:
+            out += ul(pr_reviews, get_link=get_url, get_text=get_url, padding="20px")
 
         out += f"<li>{len(issue_and_pr_comments)} comments on PRs and issues</li>"
-        out += ul(
-            issue_and_pr_comments, get_link=get_url, get_text=get_url, padding="20px"
-        )
+        if long:
+            out += ul(
+                issue_and_pr_comments,
+                get_link=get_url,
+                get_text=get_url,
+                padding="20px",
+            )
 
         out += f"<li>{len(discuss_posts)} Discuss posts (across {len(discuss_participated_topics)} topics)</li>"
-        out += ul(discuss_posts, get_link=get_url, get_text=get_url, padding="20px")
+        if long:
+            out += ul(discuss_posts, get_link=get_url, get_text=get_url, padding="20px")
 
         out += "</ul>"
 
-    p = Path("contribution_report.html")
+    if long:
+        p = Path("contribution_report_long.html")
+    else:
+        p = Path("contribution_report.html")
     with open(p, "w") as f:
         f.write(out)
 
@@ -730,9 +743,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--summarize", action="store_true", help="read from cache, don't fetch anything"
     )
+    parser.add_argument(
+        "--summarize-long",
+        action="store_true",
+        help="read from cache, don't fetch anything (with all details inline)",
+    )
     args = parser.parse_args()
 
-    if args.summarize:
-        summarize(args)
+    if args.summarize or args.summarize_long:
+        summarize(args, long=args.summarize_long)
     else:
         asyncio.run(main(args))
