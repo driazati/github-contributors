@@ -663,12 +663,9 @@ def summarize(args, long: bool):
         commit_count = sum(x[1]["totalCount"] for x in commits)
         out += f"<li>{commit_count} commits</li>"
 
-        since = datetime.datetime.fromisoformat(date_from).strftime("%Y-%m-%d")
-        until = datetime.datetime.fromisoformat(date_to).strftime("%Y-%m-%d")
-
         def user_commits(x):
             repo = x[0]
-            return f"https://github.com/{repo}/commits?author={summary['login']}&since={since}&until={until}"
+            return f"https://github.com/{repo}/commits?author={summary['login']}"
 
         out += ul(
             commits,
