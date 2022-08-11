@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 import datetime
 import re
-import textwrap
+import requests
 from typing import *
 
 
@@ -555,6 +555,21 @@ async def main(args):
             print("Keep re-running until misses == 0")
 
 
+def get_contributors(url: str) -> Set[str]:
+    content = requests.get(url).content.decode().split("\n")
+    section = None
+    contributors = set()
+    for line in content:
+        line = line.strip()
+        if line.startswith("## "):
+            section = line[3:]
+        elif section == "Committers" and line.startswith("- "):
+            m = re.search(r"@([a-zA-Z0-9-]+)", line)
+            contributors.add(m.groups()[0])
+
+    return contributors
+
+
 def summarize(args, long: bool):
     path = Path(args.cache)
     if not path.exists():
@@ -592,7 +607,7 @@ def summarize(args, long: bool):
             This is a list of non-committers that have been active on TVM and related repos in the last month. The intention of this document is to help PMC to get more information about possible committer candidates.
         </p>
         <p>
-            Note that all forms of contributions should be considered and the statistics here only serve as a reference. They do not directly correspond to the community's view of significance of contributions. See our reference document <a href="https://tvm.apache.org/docs/contribute/community.html#committers">https://tvm.apache.org/docs/contribute/community.html#committers</a> and the Apache <a href="https://community.apache.org/newcommitter.html">new committer guidelines</a> for details.
+            Note that all forms of contributions should be considered and the statistics here only serve as a reference. They do not directly correspond to the community's view of the significance of contributions. See our reference document <a href="https://tvm.apache.org/docs/contribute/community.html#committers">https://tvm.apache.org/docs/contribute/community.html#committers</a> and the Apache <a href="https://community.apache.org/newcommitter.html">new committer guidelines</a> for details.
         </p>
     """
     out += "<h2>Contributions</h2>"
@@ -608,8 +623,11 @@ def summarize(args, long: bool):
         ]
     )
 
+    contributors = get_contributors(url=args.committers_url)
     for login, data in content.items():
         if login.startswith("$$"):
+            continue
+        if login in contributors:
             continue
 
         total = 0
@@ -735,6 +753,11 @@ if __name__ == "__main__":
         "--repos",
         default="apache/tvm,apache/tvm-rfcs,tlc-pack/tlcpack,tlc-pack/ci,apache/tvm-site,apache/tvm-vta",
         help="GitHub repos to search",
+    )
+    parser.add_argument(
+        "--committers-url",
+        default="https://raw.githubusercontent.com/apache/tvm/main/CONTRIBUTORS.md",
+        help="Filter out these usernames before reporting",
     )
     parser.add_argument("--cache", default="cache.json", help="cache results file")
     parser.add_argument(
