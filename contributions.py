@@ -34,8 +34,8 @@ class Contributions:
     def __init__(
         self,
         login: str,
-        date_from: str,
-        date_to: str,
+        date_from: datetime.datetime,
+        date_to: datetime.datetime,
         repos: List[str],
         orgs: List[str],
         gql: "GraphQL",
@@ -458,11 +458,16 @@ async def main(args):
     orgs = list({x.split("/")[0] for x in repos})
     date_from = args.date_from
     date_to = args.date_to
+    only_user = args.user
     now = datetime.datetime.now().replace(microsecond=0)
     if date_to is None:
         date_to = now
+    else:
+        date_to = datetime.datetime.fromisoformat(date_to)
     if date_from is None:
         date_from = date_to - datetime.timedelta(weeks=4)
+    else:
+        date_from = datetime.datetime.fromisoformat(date_from)
 
     cache_path = Path(args.cache)
     if not cache_path.exists():
@@ -492,6 +497,8 @@ async def main(args):
 
         if len(os.getenv("DEBUG", "")) > 3:
             committer_candidates = [os.getenv("DEBUG", "")]
+        if only_user is not None:
+            committer_candidates = [only_user]
         else:
             with open(cache_path) as f:
                 contents = json.load(f)
@@ -749,6 +756,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--date-to", help="ISO 8601 date to stop looking at contributions"
     )
+    parser.add_argument("--user", help="fetch contributions for a specific user")
     parser.add_argument(
         "--repos",
         default="apache/tvm,apache/tvm-rfcs,tlc-pack/tlcpack,tlc-pack/ci,apache/tvm-site,apache/tvm-vta",
